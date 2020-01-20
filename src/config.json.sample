@@ -1,0 +1,4 @@
+{
+	"API_TOKEN" : "API Token Goes Here",
+	"DATA_STORAGE_FILENAME" : "Persistent data storage filename goes here"
+}
