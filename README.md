@@ -1,5 +1,5 @@
 # Philomath Bot
-
+A telegram chatbot to follow topics on Wikipedia and get related articles in regular interval.
 
 ## Development Setup
 1. Clone the repository
@@ -24,5 +24,4 @@
    ```
    cd src/
    python3 main.py
-   ```
-	
+   ```	

@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 from random import randint
 
 import re
+import urllib.parse
 import requests
 
 class WikiRecommender(object):
@@ -15,6 +16,7 @@ class WikiRecommender(object):
             "action" : "query",
             "prop" : "extracts",
             "exintro" : "",
+            "exsectionformat" : "wiki",
             "explaintext" : "",
             "redirects" : "1",
             "titles" : topic
@@ -22,11 +24,11 @@ class WikiRecommender(object):
         r = requests.get(url, params=params)
         title = r.json()['query']['pages'].popitem()[1]['title']
         extract = r.json()['query']['pages'].popitem()[1]['extract']
-        return (title, extract)
+        return (title, extract, "en.wikipedia.org/wiki/" + urllib.parse.quote(title))
 
     def get_content(self):
         if len(self.topics) == 0:
-            return ("No Topics", "No Topics to follow. Send me topics to follow")
+            return ("No Topics", "No Topics to follow. Send me topics to follow", "wikipedia.org")
         else:
             topic = self.topics.pop()
             return self.generate_summary(topic)
