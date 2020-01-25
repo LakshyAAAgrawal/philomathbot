@@ -4,12 +4,15 @@ from random import randint
 import re
 import urllib.parse
 import requests
+import random
 
 class WikiRecommender(object):
     def __init__(self):
-        self.topics = set()
+        self.sources = dict()
+        self.targets = dict()
+        self.recommendation_list = []
 
-    def generate_summary(self, topic):
+    def generate_summary(self, topic, sourcelist):
         url = "https://en.wikipedia.org/w/api.php"
         params = {
             "format": "json",
@@ -24,14 +27,34 @@ class WikiRecommender(object):
         r = requests.get(url, params=params)
         title = r.json()['query']['pages'].popitem()[1]['title']
         extract = r.json()['query']['pages'].popitem()[1]['extract']
-        return (title, extract, "en.wikipedia.org/wiki/" + urllib.parse.quote(title))
+        sources = ", ".join(sourcelist)
+        return (title, extract, sources,"en.wikipedia.org/wiki/" + urllib.parse.quote(title))
+
+    def update_recommendation_list(self):
+        self.recommendation_list = []
+        for target in self.targets:
+            self.recommendation_list.append((len(self.targets[target]), target))
+        self.recommendation_list.sort()
+
+    def get_recommended_item(self):
+        temp = []
+        for target_freq, target in self.recommendation_list:
+            temp.extend([target] * target_freq)
+        rand = random.randint(0, len(temp) - 1)
+        topic = temp[rand]
+        for source in self.targets[topic]:
+            self.sources[source] = self.sources[source].difference(set([topic]))
+        sourcelist = self.targets[topic]
+        del self.targets[topic]
+        self.update_recommendation_list()
+        return topic, sourcelist
 
     def get_content(self):
-        if len(self.topics) == 0:
-            return ("No Topics", "No Topics to follow. Send me topics to follow", "wikipedia.org")
+        if len(self.sources) == 0:
+            return ("No Topics", "No Topics to follow. Send me topics to follow", "None", "wikipedia.org")
         else:
-            topic = self.topics.pop()
-            return self.generate_summary(topic)
+            topic, sources = self.get_recommended_item()
+            return self.generate_summary(topic, sources)
 
     def follow_topic(self, topic):
         url = "https://en.wikipedia.org/w/api.php"
@@ -59,5 +82,27 @@ class WikiRecommender(object):
                          re.match("\/wiki\/[^:]*$", tag.attrs["href"]))
         )
         new_topics = list(map(lambda tag: tag["title"], links))
-        self.topics.update(new_topics)
+        if topic in self.sources:
+            self.sources[topic].update(new_topics)
+        else:
+            self.sources[topic] = set(new_topics)
+
+        for newtopic in new_topics:
+            if newtopic in self.targets:
+                self.targets[newtopic].add(topic)
+            else:
+                self.targets[newtopic] = set([topic])
+
+        if topic in self.targets:
+            del self.targets[topic]
+        self.update_recommendation_list()
         return len(new_topics)
+
+    def unfollow_topic(self, topic):
+        if topic in self.sources:
+            for target in self.sources[topic]:
+                self.targets[target] = self.targets[target].difference(set([topic]))
+                if len(self.targets[target]) == 0:
+                    del self.targets[target]
+            del self.sources[topic]
+            self.update_recommendation_list()

@@ -49,8 +49,8 @@ def send_link(context):
     job = context.job
     recommender = job.context['recommender']
     chat_id = job.context['chat_id']
-    title, summary, link = recommender.get_content()
-    text = "*{}*\n{}\n[Full Article Here]({})".format(title, summary, link)
+    title, summary, sources, link = recommender.get_content()
+    text = "*{}*\nSources : {}\n{}\n[Full Article Here]({})".format(title, sources, summary, link)
     context.bot.send_message(chat_id, text = text, parse_mode = ParseMode.MARKDOWN)
 
 def set_interval(update, context):
@@ -64,7 +64,7 @@ def set_interval(update, context):
             due = due * 60
         else:
             pass
-        if due < 0 or due > 604800:
+        if due < 60 or due > 604800:
             update.message.reply_text('Sorry that is not a permissible value')
             return
 
@@ -100,7 +100,10 @@ def main():
     with open('config.json') as fp:
         config = json.load(fp)
 
-    pp = CustomPersistence(filename = config['DATA_STORAGE_FILENAME'])
+    pp = CustomPersistence(
+        filename = config['DATA_STORAGE_FILENAME'],
+        customfilename = config['CUSTOM_DATA_FILENAME']
+    )
     updater = Updater(config['API_TOKEN'], use_context=True, persistence = pp)
     dp = updater.dispatcher
 
