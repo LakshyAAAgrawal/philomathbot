@@ -11,12 +11,15 @@ logging.basicConfig(format = '%(asctime)s - %(name)s - %(levelname)s - %(message
                     level = logging.INFO)
 logger = logging.getLogger(__name__)
 
+BEGINMSG = 'Hi! Send topics here to follow and get updated with\
+ related Wikipedia articles.\n\n/set <number> hours/minutes to set the update interval.\
+ Default is 24 hours.\n\n/list to get a list of topics followed\n\n/unfollow <topic name> to unfollow topics\
+\n\nReport bugs and make feature requests at \
+https://github.com/LakshyAAAgrawal/philomathbot'
+
 def start(update, context):
     chat_id = update.message.chat_id
-    update.message.reply_text('Hi! Send topics here to follow and get updated with\
- related Wikipedia articles.\n\n/set <number> hours/minutes to set the update interval.\
- Default is 24 hours.\n\n\
-Report bugs and make feature requests at https://github.com/LakshyAAAgrawal/philomathbot')
+    update.message.reply_text(BEGINMSG)
     if 'job' in context.chat_data:
         old_jobs = context.job_queue.get_jobs_by_name(context.chat_data['job'].name)
         for old_job in old_jobs:
@@ -88,6 +91,19 @@ def set_interval(update, context):
     except (IndexError, ValueError):
         update.message.reply_text('Usage: /set <value> <unit(hour/minute)>')
 
+def list_followed(update, context):
+    chat_id = update.message.chat_id
+    recommender = context.chat_data['recommender']
+    text = "List of topics you currently follow:\n\n{}\n\n/unfollow <topic name>, to unfollow topics".format("\n".join(recommender.list_of_followed()))
+    context.bot.send_message(chat_id, text = text, parse_mode = ParseMode.MARKDOWN)
+
+def unfollow_topic(update, context):
+    chat_id = update.message.chat_id
+    recommender = context.chat_data["recommender"]
+    arg = " ".join(context.args)
+    recommender.unfollow_topic(arg)
+    update.message.reply_text('Topic unfollowed!')
+
 def follow_topic(update, context):
     num_links = context.chat_data['recommender'].follow_topic(update.message.text)
     if num_links == 0:
@@ -111,8 +127,14 @@ def main():
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("help", start))
     dp.add_handler(CommandHandler("stop", stop))
+    dp.add_handler(CommandHandler("list", list_followed))
     dp.add_handler(CommandHandler("set",
                                   set_interval,
+                                  pass_args = True,
+                                  pass_job_queue = True,
+                                  pass_chat_data = True))
+    dp.add_handler(CommandHandler("unfollow",
+                                  unfollow_topic,
                                   pass_args = True,
                                   pass_job_queue = True,
                                   pass_chat_data = True))

@@ -30,6 +30,20 @@ class WikiRecommender(object):
         sources = ", ".join(sourcelist)
         return (title, extract, sources,"en.wikipedia.org/wiki/" + urllib.parse.quote(title))
 
+    def list_of_followed(self):
+        return list(self.sources)
+
+    def unfollow_topic(self, topic):
+        list_to_unfollow = self.list_of_topics_in_page(topic)
+        for unwanted_topic in list_to_unfollow:
+            if unwanted_topic in self.targets:
+                for source in self.targets[unwanted_topic]:
+                    self.sources[source].difference_update(set([unwanted_topic]))
+                del self.targets[unwanted_topic]
+        if topic in self.sources:
+            del self.sources[topic]
+        self.update_recommendation_list()
+
     def update_recommendation_list(self):
         self.recommendation_list = []
         for target in self.targets:
@@ -56,11 +70,11 @@ class WikiRecommender(object):
             topic, sources = self.get_recommended_item()
             return self.generate_summary(topic, sources)
 
-    def follow_topic(self, topic):
+    def list_of_topics_in_page(self, page_title):
         url = "https://en.wikipedia.org/w/api.php"
         params = {
             "action" : "opensearch",
-            "search" : topic,
+            "search" : page_title,
             "limit" : 1,
             "namespace" : 0,
             "format" : "json",
@@ -82,6 +96,10 @@ class WikiRecommender(object):
                          re.match("\/wiki\/[^:]*$", tag.attrs["href"]))
         )
         new_topics = list(map(lambda tag: tag["title"], links))
+        return new_topics
+
+    def follow_topic(self, topic):
+        new_topics = self.list_of_topics_in_page(topic)
         if topic in self.sources:
             self.sources[topic].update(new_topics)
         else:
@@ -97,12 +115,3 @@ class WikiRecommender(object):
             del self.targets[topic]
         self.update_recommendation_list()
         return len(new_topics)
-
-    def unfollow_topic(self, topic):
-        if topic in self.sources:
-            for target in self.sources[topic]:
-                self.targets[target] = self.targets[target].difference(set([topic]))
-                if len(self.targets[target]) == 0:
-                    del self.targets[target]
-            del self.sources[topic]
-            self.update_recommendation_list()
