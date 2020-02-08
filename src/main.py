@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 BEGINMSG = 'Hi! Send topics here to follow and get updated with\
  related Wikipedia articles.\n\n/set <number> hours/minutes to set the update interval.\
  Default is 24 hours.\n\n/list to get a list of topics followed\n\n/unfollow <topic name> to unfollow topics\
-\n\nReport bugs and make feature requests at \
+\n\n/toggle summary, to toggle the sending of long text summary\n\nReport bugs and make feature requests at \
 https://github.com/LakshyAAAgrawal/philomathbot'
 
 def start(update, context):
@@ -55,6 +55,17 @@ def send_link(context):
     title, summary, sources, link = recommender.get_content()
     text = "*{}*\nSources : {}\n{}\n[Full Article Here]({})".format(title, sources, summary, link)
     context.bot.send_message(chat_id, text = text, parse_mode = ParseMode.MARKDOWN)
+
+def toggle(update, context):
+    try:
+        setting_name = context.args[0]
+        if setting_name == "summary":
+            context.chat_data["recommender"].toggle_summary()
+            update.message.reply_text("Summary setting updated")
+        else:
+            update.message.reply_text('Not a valid setting name')
+    except (IndexError):
+        update.message.reply_text('Usage: /toggle <setting name>\nSupported settings: summary')
 
 def set_interval(update, context):
     chat_id = update.message.chat_id
@@ -130,6 +141,11 @@ def main():
     dp.add_handler(CommandHandler("list", list_followed))
     dp.add_handler(CommandHandler("set",
                                   set_interval,
+                                  pass_args = True,
+                                  pass_job_queue = True,
+                                  pass_chat_data = True))
+    dp.add_handler(CommandHandler("toggle",
+                                  toggle,
                                   pass_args = True,
                                   pass_job_queue = True,
                                   pass_chat_data = True))

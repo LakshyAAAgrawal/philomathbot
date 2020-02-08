@@ -13,20 +13,28 @@ class WikiRecommender(object):
         self.recommendation_list = []
 
     def generate_summary(self, topic, sourcelist):
-        url = "https://en.wikipedia.org/w/api.php"
-        params = {
-            "format": "json",
-            "action" : "query",
-            "prop" : "extracts",
-            "exintro" : "",
-            "exsectionformat" : "wiki",
-            "explaintext" : "",
-            "redirects" : "1",
-            "titles" : topic
-        }
-        r = requests.get(url, params=params)
-        title = r.json()['query']['pages'].popitem()[1]['title']
-        extract = r.json()['query']['pages'].popitem()[1]['extract']
+        try:
+            summary_text = self.summary_text
+        except:
+            self.summary_text = True
+            summary_text = self.summary_text
+        if summary_text:
+            url = "https://en.wikipedia.org/w/api.php"
+            params = {
+                "format": "json",
+                "action" : "query",
+                "prop" : "extracts",
+                "exintro" : "",
+                "exsectionformat" : "wiki",
+                "explaintext" : "",
+                "redirects" : "1",
+                "titles" : topic
+            }
+            r = requests.get(url, params=params)
+            extract = r.json()['query']['pages'].popitem()[1]['extract']
+        else:
+            extract = ""
+        title = topic
         sources = ", ".join(sourcelist)
         return (title, extract, sources,"en.wikipedia.org/wiki/" + urllib.parse.quote(title))
 
@@ -34,12 +42,16 @@ class WikiRecommender(object):
         return list(self.sources)
 
     def unfollow_topic(self, topic):
-        list_to_unfollow = self.list_of_topics_in_page(topic)
+        root_page, list_to_unfollow = self.list_of_topics_in_page(topic)
+        if root_page == "":
+            return
         for unwanted_topic in list_to_unfollow:
             if unwanted_topic in self.targets:
                 for source in self.targets[unwanted_topic]:
                     self.sources[source].difference_update(set([unwanted_topic]))
                 del self.targets[unwanted_topic]
+        if root_page in self.sources:
+            del self.sources[root_page]
         if topic in self.sources:
             del self.sources[topic]
         self.update_recommendation_list()
@@ -63,6 +75,12 @@ class WikiRecommender(object):
         self.update_recommendation_list()
         return topic, sourcelist
 
+    def toggle_summary(self):
+        try:
+            self.summary_text = not self.summary_text
+        except:
+            self.summary_text = False
+
     def get_content(self):
         if len(self.sources) == 0:
             return ("No Topics", "No Topics to follow. Send me topics to follow", "None", "wikipedia.org")
@@ -81,8 +99,8 @@ class WikiRecommender(object):
         }
         r = requests.get(url, params=params)
         if len(r.json()[3]) == 0:
-            return 0
-
+            return "", []
+        print(r.json())
         root_page = r.json()[1][0]
         r = requests.get(r.json()[3][0])
         soup = BeautifulSoup(r.text, 'html.parser')
@@ -96,22 +114,26 @@ class WikiRecommender(object):
                          re.match("\/wiki\/[^:]*$", tag.attrs["href"]))
         )
         new_topics = list(map(lambda tag: tag["title"], links))
-        return new_topics
+        return root_page, new_topics
 
     def follow_topic(self, topic):
-        new_topics = self.list_of_topics_in_page(topic)
-        if topic in self.sources:
-            self.sources[topic].update(new_topics)
+        root_page, new_topics = self.list_of_topics_in_page(topic)
+        if root_page == "":
+            return 0
+        if root_page in self.sources:
+            self.sources[root_page].update(new_topics)
         else:
-            self.sources[topic] = set(new_topics)
+            self.sources[root_page] = set(new_topics)
 
         for newtopic in new_topics:
             if newtopic in self.targets:
-                self.targets[newtopic].add(topic)
+                self.targets[newtopic].add(root_page)
             else:
-                self.targets[newtopic] = set([topic])
+                self.targets[newtopic] = set([root_page])
 
-        if topic in self.targets:
-            del self.targets[topic]
+        if root_page in self.targets:
+            for source in self.targets[root_page]:
+                self.sources[source].difference_update(set([root_page]))
+            del self.targets[root_page]
         self.update_recommendation_list()
         return len(new_topics)
